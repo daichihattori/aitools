@@ -23,22 +23,34 @@ VM 内で実行する。
 ```bash
 export OPENCLAW_GATEWAY_TOKEN=smolvm-local-token
 
-openclaw gateway \
+mkdir -p /tmp/openclaw
+
+nohup openclaw gateway run \
   --port 18789 \
-  --allow-unconfigured \
-  --verbose
+  --verbose \
+  > /tmp/openclaw/gateway.log 2>&1 < /dev/null &
+
+tail -f /tmp/openclaw/gateway.log
 ```
 
-Gateway はこのターミナルで起動したままにする。
+ログに `ready` が出ればよい。`tail -f` は `Ctrl-C` で止めてもよい。Gateway は background で動き続ける。
 
 ---
 
 ## 2. Claude Code に MCP server を登録する
 
-ホスト側で実行する。
+ホスト側で実行する。勉強会では、手元の環境だけに隠れる `local` scope ではなく、プロジェクトで確認しやすい `project` scope に登録する。
+
+すでに同名の設定がある場合は削除する。
 
 ```bash
-claude mcp add --transport stdio openclaw \
+claude mcp remove openclaw
+```
+
+登録する。
+
+```bash
+claude mcp add --scope project --transport stdio openclaw \
   -- smolvm machine exec --name openclaw -- \
     openclaw mcp serve \
     --url ws://localhost:18789 \
@@ -51,6 +63,13 @@ claude mcp add --transport stdio openclaw \
 ここで起動されるのは、VM 内の `openclaw mcp serve`。この bridge が同じ VM 内の Gateway に `ws://localhost:18789` で WebSocket 接続する。
 
 この形にすると、Gateway を LAN 公開しなくてよい。ホスト側に OpenClaw CLI を入れる必要もない。
+
+登録内容を確認する。
+
+```bash
+claude mcp get openclaw
+claude mcp list
+```
 
 ---
 
@@ -117,13 +136,11 @@ ws://localhost:18789
 
 ### `Missing config` と出る
 
-Gateway 起動コマンドに `--allow-unconfigured` が付いているか確認する。
+Gateway 用の最小設定を入れる。
 
 ```bash
-openclaw gateway \
-  --port 18789 \
-  --allow-unconfigured \
-  --verbose
+openclaw config set gateway.mode local
+openclaw config set gateway.port 18789 --strict-json
 ```
 
 ### `non-loopback Control UI requires...` と出る
@@ -141,7 +158,7 @@ Gateway 起動時に `--bind lan` を付けている。Claude Code MCP の手順
 ## ここまでできたこと
 
 - smolvm 内で OpenClaw Gateway を起動した
-- ホスト側の Claude Code に `openclaw mcp serve` を登録した
+- Claude Code に project scope で `openclaw mcp serve` を登録した
 - Claude Code から MCP 経由で OpenClaw Gateway に接続した
 
 次のステップでは、この Gateway をチームで共有する構成にする。

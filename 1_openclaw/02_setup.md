@@ -1,14 +1,15 @@
 # インストールとセットアップ
 
-この章では `smol-machines/smolvm` で OpenClaw Gateway 用の VM を作る。
+この章では `smol-machines/smolvm` の VM 内で OpenClaw Gateway を起動する。
 
-ポイントは **Smolfile 1 枚で環境を宣言する**こと。参加者は同じ Smolfile から同じ Node.js + OpenClaw 環境を起動できる。
+この勉強会では、OpenClaw Gateway を **Claude Code から MCP で接続する先**として使う。Gateway は VM 内の `localhost:18789` で待ち受けさせる。
 
-```
+```text
 ホストマシン
+├── Claude Code
 └── smolvm machine: openclaw
-    └── Node.js 24
-        └── OpenClaw Gateway :18789（VM 内 localhost）
+    └── OpenClaw Gateway
+        └── localhost:18789
 ```
 
 ---
@@ -21,17 +22,15 @@
 curl -sSL https://smolmachines.com/install.sh | bash
 ```
 
-インストール後にコマンドが見えることを確認する。
+確認する。
 
 ```bash
 smolvm --help
 ```
 
-> macOS では Hypervisor.framework、Linux では KVM を使う。Linux の場合は `/dev/kvm` が使える環境で実行する。
-
 ---
 
-## 2. OpenClaw 用の Smolfile を作る
+## 2. Smolfile を作る
 
 作業ディレクトリを作る。
 
@@ -58,16 +57,14 @@ init = [
 | 設定 | 意味 |
 | --- | --- |
 | `image = "node:24-bookworm"` | Node.js 24 入りの Debian 系イメージを使う |
-| `net = true` | npm install と Gateway 通信のためにネットワークを有効化 |
+| `net = true` | `npm install -g openclaw` のためにネットワークを有効化 |
 | `[dev].init` | VM 作成時に OpenClaw CLI を入れてバージョン確認する |
-
-> 勉強会ではまず `net = true` で進める。Claude Code MCP 接続まで動いたあと、必要に応じて `allow_hosts` で外向き通信を絞る。
 
 ---
 
 ## 3. VM を作成・起動する
 
-Smolfile から永続 VM を作る。
+Smolfile から VM を作る。
 
 ```bash
 smolvm machine create openclaw -s Smolfile
@@ -79,10 +76,9 @@ VM を起動する。
 smolvm machine start --name openclaw
 ```
 
-中に OpenClaw が入っていることを確認する。
+OpenClaw CLI が入っていることを確認する。
 
 ```bash
-smolvm machine exec --name openclaw -- node --version
 smolvm machine exec --name openclaw -- openclaw --version
 ```
 
@@ -94,50 +90,62 @@ smolvm machine exec --name openclaw -it -- sh
 
 ---
 
-## 4. OpenClaw の初期設定について
+## 4. OpenClaw の最小 config を入れる
 
-この資料では `openclaw onboard` は使わない。
+Gateway に必要な値を `openclaw config set` で入れる。
 
-`onboard` は対話式の初期設定ウィザードなので、smolvm 経由の PTY と相性が悪い環境では画面が崩れることがある。勉強会では再現性を優先し、必要な値を環境変数で渡して Gateway を直接起動する。
+VM 内で実行する。
 
-LLM バックエンドの API キーを使う場合は、Gateway 起動時の環境変数や設定ファイルで渡す。この資料では Claude Code 側の Claude を使うため、OpenClaw 側の LLM バックエンド設定は扱わない。
+```bash
+openclaw config set gateway.mode local
+openclaw config set gateway.port 18789 --strict-json
+```
+
+確認する。
+
+```bash
+openclaw config get gateway.mode
+openclaw config get gateway.port
+```
+
+`local` と `18789` が出ればよい。
 
 ---
 
 ## 5. Gateway を起動する
 
-Gateway は `18789` 番ポートで起動する。
-
-ここからは VM 内で実行する。
+VM 内で実行する。
 
 ```bash
 export OPENCLAW_GATEWAY_TOKEN=smolvm-local-token
 
-openclaw gateway \
+mkdir -p /tmp/openclaw
+
+nohup openclaw gateway run \
   --port 18789 \
-  --allow-unconfigured \
-  --verbose
+  --verbose \
+  > /tmp/openclaw/gateway.log 2>&1 < /dev/null &
+
+tail -f /tmp/openclaw/gateway.log
 ```
 
-勉強会では説明を簡単にするため Gateway token を固定値にしているが、実運用では `openclaw doctor --generate-gateway-token` などで生成した値を使う。
+ログに `ready` が出れば Gateway は起動している。
 
-ここでは `--bind lan` を付けない。Gateway は VM 内の localhost で待ち受ける。Claude Code からは次章で `smolvm machine exec` 経由の MCP server を使って接続する。
+```text
+[gateway] ready
+```
 
-`Missing config. Run openclaw setup...` と出る場合は `--allow-unconfigured` が付いているか確認する。ここでは MCP 接続前の空設定で Gateway を起動するため、このオプションを付ける。
-
-`non-loopback Control UI requires gateway.controlUi.allowedOrigins...` と出る場合は、`--bind lan` を付けて起動している。Claude Code MCP の手順では `--bind lan` を外す。
-
----
-
-## 6. 動作確認
-
-Gateway を起動しているターミナルで、エラーが出ずにプロセスが残っていればセットアップ完了。
+`tail -f` はログを見るためだけのコマンド。`Ctrl-C` で止めても Gateway は background で動き続ける。
 
 ---
 
-## 7. 停止・再開
+## 6. 停止・再開
 
-Gateway はフォアグラウンドで起動しているので、起動中のターミナルで `Ctrl-C` すると止まる。
+Gateway だけ止める場合は VM 内で実行する。
+
+```bash
+pkill -f "openclaw gateway"
+```
 
 VM 自体を止める。
 
@@ -157,10 +165,14 @@ VM 内で Gateway を起動する。
 ```bash
 export OPENCLAW_GATEWAY_TOKEN=smolvm-local-token
 
-openclaw gateway \
+mkdir -p /tmp/openclaw
+
+nohup openclaw gateway run \
   --port 18789 \
-  --allow-unconfigured \
-  --verbose
+  --verbose \
+  > /tmp/openclaw/gateway.log 2>&1 < /dev/null &
+
+tail -f /tmp/openclaw/gateway.log
 ```
 
 不要になったら削除する。
@@ -173,9 +185,9 @@ smolvm machine delete openclaw
 
 ## ここまでできたこと
 
-- `smol-machines/smolvm` をインストールした
-- Smolfile 1 枚で Node.js + OpenClaw 環境を宣言した
-- OpenClaw Gateway を VM 内で起動した
-- Gateway を VM 内 localhost で待ち受けさせた
+- Smolfile から `openclaw` VM を作った
+- VM 内に OpenClaw CLI を入れた
+- `gateway.mode=local` と `gateway.port=18789` を設定した
+- OpenClaw Gateway を VM 内 `localhost:18789` で起動した
 
 次のステップでは、この Gateway に Claude Code から MCP 接続する。

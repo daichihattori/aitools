@@ -57,16 +57,20 @@ VM 内で実行する。
 ```bash
 export OPENCLAW_GATEWAY_TOKEN=shared-gateway-token
 
-openclaw gateway \
+mkdir -p /tmp/openclaw
+
+nohup openclaw gateway run \
   --port 18789 \
-  --allow-unconfigured \
-  --verbose
+  --verbose \
+  > /tmp/openclaw/gateway.log 2>&1 < /dev/null &
+
+tail -f /tmp/openclaw/gateway.log
 ```
 
 このローカル構成では、各メンバーは同じマシン上の Gateway に `smolvm machine exec` 経由で接続する。
 
 ```bash
-claude mcp add --transport stdio openclaw \
+claude mcp add --scope project --transport stdio openclaw \
   -- smolvm machine exec --name openclaw -- \
     openclaw mcp serve \
     --url ws://localhost:18789 \
@@ -79,7 +83,7 @@ claude mcp add --transport stdio openclaw \
 実運用では token の直書きを避け、`--token-file` を使う。
 
 ```bash
-claude mcp add --transport stdio openclaw \
+claude mcp add --scope project --transport stdio openclaw \
   -- smolvm machine exec --name openclaw -- \
     openclaw mcp serve \
     --url ws://localhost:18789 \
