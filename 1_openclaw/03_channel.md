@@ -105,15 +105,24 @@ reaction_removed
 
 ## 5. OpenClaw に Slack token を渡す
 
-前章で作った smolvm の `openclaw` VM に環境変数を渡して Gateway を起動する。
+前章で作った smolvm の `openclaw` VM に入る。
 
 ```bash
-smolvm machine exec --name openclaw -it -- sh -lc '
-  export SLACK_APP_TOKEN="xapp-..."
-  export SLACK_BOT_TOKEN="xoxb-..."
-  export OPENCLAW_GATEWAY_TOKEN="smolvm-local-token"
-  openclaw gateway --port 18789 --bind lan --verbose
-'
+smolvm machine exec --name openclaw -it -- sh
+```
+
+VM 内で Slack token と Gateway token を設定して起動する。
+
+```bash
+export SLACK_APP_TOKEN="xapp-..."
+export SLACK_BOT_TOKEN="xoxb-..."
+export OPENCLAW_GATEWAY_TOKEN="smolvm-local-token"
+
+openclaw gateway \
+  --port 18789 \
+  --bind lan \
+  --allow-unconfigured \
+  --verbose
 ```
 
 Gateway 起動ログに Slack channel の接続ログが出ればよい。
@@ -135,7 +144,12 @@ EOF
 
 chmod 600 ~/.openclaw-slack-env
 source ~/.openclaw-slack-env
-openclaw gateway --port 18789 --bind lan --verbose
+
+openclaw gateway \
+  --port 18789 \
+  --bind lan \
+  --allow-unconfigured \
+  --verbose
 ```
 
 ---
