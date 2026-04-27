@@ -91,12 +91,7 @@ claude mcp add --transport stdio openclaw \
 
 ## 4. 運用チェック
 
-Gateway の健康状態。
-
-```bash
-smolvm machine exec --name openclaw -- openclaw status
-smolvm machine exec --name openclaw -- openclaw gateway status
-```
+Gateway を起動しているターミナルで、エラーが出ずにプロセスが残っていることを確認する。
 
 ログ。
 
