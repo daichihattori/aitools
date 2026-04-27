@@ -69,7 +69,7 @@ openclaw gateway \
 claude mcp add --transport stdio openclaw \
   -- smolvm machine exec --name openclaw -- \
     openclaw mcp serve \
-    --url ws://127.0.0.1:18789 \
+    --url ws://localhost:18789 \
     --token shared-gateway-token \
     --claude-channel-mode on
 ```
@@ -82,7 +82,7 @@ claude mcp add --transport stdio openclaw \
 claude mcp add --transport stdio openclaw \
   -- smolvm machine exec --name openclaw -- \
     openclaw mcp serve \
-    --url ws://127.0.0.1:18789 \
+    --url ws://localhost:18789 \
     --token-file ~/.openclaw/gateway.token \
     --claude-channel-mode on
 ```

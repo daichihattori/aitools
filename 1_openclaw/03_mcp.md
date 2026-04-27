@@ -41,14 +41,14 @@ Gateway はこのターミナルで起動したままにする。
 claude mcp add --transport stdio openclaw \
   -- smolvm machine exec --name openclaw -- \
     openclaw mcp serve \
-    --url ws://127.0.0.1:18789 \
+    --url ws://localhost:18789 \
     --token smolvm-local-token \
     --claude-channel-mode on
 ```
 
 `--` より前は Claude Code 側の設定、`--` より後ろは Claude Code が起動する MCP server コマンド。
 
-ここで起動されるのは、VM 内の `openclaw mcp serve`。この bridge が同じ VM 内の Gateway に `ws://127.0.0.1:18789` で WebSocket 接続する。
+ここで起動されるのは、VM 内の `openclaw mcp serve`。この bridge が同じ VM 内の Gateway に `ws://localhost:18789` で WebSocket 接続する。
 
 この形にすると、Gateway を LAN 公開しなくてよい。ホスト側に OpenClaw CLI を入れる必要もない。
 
@@ -112,7 +112,7 @@ claude mcp get openclaw
 登録内容の `--url` は VM 内 localhost を指す。
 
 ```text
-ws://127.0.0.1:18789
+ws://localhost:18789
 ```
 
 ### `Missing config` と出る
