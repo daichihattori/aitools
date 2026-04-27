@@ -1,0 +1,19 @@
+direction: right
+
+slack: "Slack"
+
+host: {
+  label: "Host machine"
+  shape: rectangle
+
+  smolvm: {
+    label: "smolvm sandbox"
+    shape: rectangle
+    openclaw: "OpenClaw Gateway"
+  }
+}
+
+backend: "LLM / tools"
+
+slack -> host.smolvm.openclaw: "message"
+host.smolvm.openclaw -> backend: "run"

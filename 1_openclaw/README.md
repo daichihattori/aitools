@@ -4,27 +4,9 @@ smolvm 上で OpenClaw Gateway を動かし、Slack からチームで使える 
 
 ## 全体構成図
 
-```d2
-direction: right
+![OpenClaw と smolvm の構成図](architecture.svg)
 
-slack: "Slack"
-
-host: {
-  label: "Host machine"
-  shape: rectangle
-
-  smolvm: {
-    label: "smolvm sandbox"
-    shape: rectangle
-    openclaw: "OpenClaw Gateway"
-  }
-}
-
-backend: "LLM / tools"
-
-slack -> host.smolvm.openclaw: "message"
-host.smolvm.openclaw -> backend: "run"
-```
+D2 ソース: [architecture.d2](architecture.d2)
 
 ## 構成
 
