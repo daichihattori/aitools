@@ -2,15 +2,15 @@
 
 この章では、個人のローカル実験から一歩進めて、チームで共有する OpenClaw Gateway の考え方を整理する。
 
-Slack 連携までできると、OpenClaw は「個人の CLI ツール」ではなく「チームのチャットに常駐する Gateway」になる。
+Claude Code MCP 接続までできると、OpenClaw は「自分の手元だけで動く Gateway」から「複数人が接続できる共有 Gateway」になる。
 
-```
-Team Slack
-  ↓
+```text
+Developer A: Claude Code
+Developer B: Claude Code
+Developer C: Claude Code
+        ↓ MCP
 Shared OpenClaw Gateway
-  ↓
-Agents / tools / approvals
-  ↓
+        ↓
 smolvm sandbox
 ```
 
@@ -22,10 +22,10 @@ smolvm sandbox
 
 | 観点 | 個人利用 | チーム共有 |
 | --- | --- | --- |
-| 認証 | 自分だけ | Slack ユーザー、チャンネル、approver |
-| Gateway | localhost で十分 | 常時起動、再起動、ログ確認が必要 |
+| Claude Code | 自分の MCP 設定だけ | 各メンバーが同じ Gateway に接続 |
+| Gateway | localhost / LAN で十分 | 常時起動、再起動、ログ確認が必要 |
 | token | 手元の環境変数 | Secret 管理が必要 |
-| チャンネル | DM 中心 | public / private channel と thread |
+| 接続元 | 自分の端末だけ | 複数メンバーの端末 |
 | 実行 | 試行錯誤 | 承認、監査、権限分離 |
 
 ---
@@ -35,66 +35,61 @@ smolvm sandbox
 勉強会では、まず次の構成を目標にする。
 
 ```text
-Slack workspace
-  └── #openclaw-lab
-      └── OpenClaw bot
+各メンバーの端末
+  └── Claude Code
+      └── openclaw mcp serve
 
 講師または共有マシン
   └── smolvm machine: openclaw
       └── OpenClaw Gateway
 ```
 
-Gateway は外部に広く公開しない。Slack Socket Mode を使えば、Slack 側から Gateway に直接 HTTP 到達できる必要はない。
-
-Control UI を開く場合も、LAN / VPN / Tailscale など信頼できる範囲に閉じる。
+Gateway は外部に広く公開しない。LAN / VPN / Tailscale など信頼できる範囲からだけ接続する。
 
 ---
 
-## 3. Slack の権限設計
+## 3. 共有時の接続例
 
-最初はチャンネルを限定する。
+Gateway 側は共有マシンで起動する。
 
-```text
-#openclaw-lab
-```
-
-運用ルール：
-
-- bot を invite するチャンネルを限定する
-- チャンネルでは mention 必須にする
-- DM は pairing または allowlist にする
-- 実行系の操作は approval を挟む
-- token を Slack や資料に貼らない
-
-この章の主題は「何でも自動化できる」ではなく、「チームが安全に使える入口を作る」こと。
-
----
-
-## 4. Gateway の起動例
-
-勉強会用の簡易起動。
+VM 内で実行する。
 
 ```bash
-smolvm machine exec --name openclaw -it -- sh
-```
-
-VM 内で起動する。
-
-```bash
-source ~/.openclaw-slack-env
+export OPENCLAW_GATEWAY_TOKEN=shared-gateway-token
 
 openclaw gateway \
   --port 18789 \
-  --bind lan \
   --allow-unconfigured \
   --verbose
 ```
 
-実運用では固定 token の直書きを避け、ホスト側の secret 管理、systemd / launchd / supervisor、Tailscale などを組み合わせる。
+このローカル構成では、各メンバーは同じマシン上の Gateway に `smolvm machine exec` 経由で接続する。
+
+```bash
+claude mcp add --transport stdio openclaw \
+  -- smolvm machine exec --name openclaw -- \
+    openclaw mcp serve \
+    --url ws://127.0.0.1:18789 \
+    --token shared-gateway-token \
+    --claude-channel-mode on
+```
+
+別マシンのメンバーからも接続させる場合は、`--bind lan` と Control UI の allowed origins など追加設定が必要になる。この勉強会ではまずローカル共有までに留める。
+
+実運用では token の直書きを避け、`--token-file` を使う。
+
+```bash
+claude mcp add --transport stdio openclaw \
+  -- smolvm machine exec --name openclaw -- \
+    openclaw mcp serve \
+    --url ws://127.0.0.1:18789 \
+    --token-file ~/.openclaw/gateway.token \
+    --claude-channel-mode on
+```
 
 ---
 
-## 5. 運用チェック
+## 4. 運用チェック
 
 Gateway の健康状態。
 
@@ -103,39 +98,40 @@ smolvm machine exec --name openclaw -- openclaw status
 smolvm machine exec --name openclaw -- openclaw gateway status
 ```
 
-チャンネル状態。
-
-```bash
-smolvm machine exec --name openclaw -- openclaw channels status --probe
-```
-
 ログ。
 
 ```bash
 smolvm machine exec --name openclaw -- openclaw logs --follow
 ```
 
+Claude Code 側の MCP 設定。
+
+```bash
+claude mcp get openclaw
+claude mcp list
+```
+
 ---
 
-## 6. チーム導入時の注意点
+## 5. チーム導入時の注意点
 
 ### Gateway を公開しすぎない
 
-`--bind lan` や remote access を使う場合は、必ず token / password / VPN / firewall を組み合わせる。
+`--bind lan` を使う場合は、必ず token / VPN / firewall / Control UI allowed origins を組み合わせる。
 
-Slack Socket Mode だけなら、Gateway の HTTP endpoint をインターネットに公開する必要はない。
-
-### Slack の文脈は信頼しすぎない
-
-チャンネル名、トピック、過去ログ、添付ファイルはすべてプロンプト注入の入口になり得る。
-
-エージェントに実行権限を与える場合は、approval と allowlist を前提にする。
+インターネットに直接公開するより、Tailscale などの private network 経由にするほうが扱いやすい。
 
 ### token を分ける
 
-勉強会用、検証用、本番用の Slack App / Gateway token / LLM API key は分ける。
+勉強会用、検証用、本番用の Gateway token は分ける。
 
 同じ token を複数環境で使い回さない。
+
+### Claude Code の MCP 設定を共有しすぎない
+
+`.mcp.json` などで設定を共有する場合も、token はファイルや環境変数に逃がす。
+
+`--token shared-gateway-token` のような値をリポジトリに入れない。
 
 ---
 
@@ -143,10 +139,10 @@ Slack Socket Mode だけなら、Gateway の HTTP endpoint をインターネッ
 
 OpenClaw のチーム利用で重要なのは、モデル選択よりも Gateway の共有方法と権限設計。
 
-- Slack を入口にする
-- Gateway をチームで共有する
-- smolvm で実行環境を隔離する
+- Claude Code を MCP client として使う
+- OpenClaw Gateway をチームで共有する
+- smolvm で Gateway と実行環境を隔離する
 - token と実行権限を分ける
 - approval を前提にする
 
-この形にすると、OpenClaw は「各自がローカルで動かす実験ツール」から「チームの作業入口」になる。
+この形にすると、OpenClaw は「各自がローカルで動かす実験ツール」から「チームの Gateway」になる。

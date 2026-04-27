@@ -1,6 +1,6 @@
 direction: right
 
-slack: "Slack"
+claude: "Claude Code\nLLM + MCP client"
 
 host: {
   label: "Host machine"
@@ -13,7 +13,7 @@ host: {
   }
 }
 
-backend: "LLM / tools"
+tools: "Tools / approvals"
 
-slack -> host.smolvm.openclaw: "message"
-host.smolvm.openclaw -> backend: "run"
+claude -> host.smolvm.openclaw: "MCP"
+host.smolvm.openclaw -> tools: "run"

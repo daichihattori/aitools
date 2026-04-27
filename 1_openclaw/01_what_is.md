@@ -1,11 +1,11 @@
 # OpenClaw と smolvm とは
 
-この勉強会では、OpenClaw を「LLM を切り替えるツール」としてではなく、**チャットと AI エージェントをつなぐ Gateway** として扱う。
+この勉強会では、OpenClaw を **Claude Code から使う MCP Gateway** として扱う。
 
 主に見る強みは 2 つ。
 
-1. Slack などのチャンネルからエージェントを呼べる
-3. チームで共有する Gateway を建てられる
+1. Claude Code から MCP 経由で OpenClaw Gateway に接続できる
+3. Gateway をチームで共有できる
 
 ---
 
@@ -13,7 +13,7 @@
 
 `smol-machines/smolvm` は、ローカルで軽量な Linux VM を起動する CLI ツール。
 
-```
+```text
 コンテナ
   ↓ 共有カーネル
 
@@ -21,7 +21,7 @@ smolvm
   ↓ workload ごとに Linux VM
 ```
 
-OpenClaw をホストマシンに直接入れず、隔離された VM の中で動かすために使う。
+OpenClaw Gateway をホストマシンに直接入れず、隔離された VM の中で動かすために使う。
 
 ### 特徴
 
@@ -47,70 +47,71 @@ Node.js + OpenClaw Gateway
 
 ## OpenClaw
 
-OpenClaw は、チャットアプリと AI エージェントをつなぐセルフホスト型 Gateway。
+OpenClaw は、MCP client やチャットアプリから接続できるセルフホスト型 Gateway。
+
+この資料では Claude Code から接続する。
 
 ```text
-Slack
-  ↓
+Claude Code
+  ↓ MCP
+openclaw mcp serve
+  ↓ WebSocket
 OpenClaw Gateway
-  ↓
-LLM / tools / approvals
 ```
 
-Slack から話しかけると、OpenClaw Gateway が会話、権限、ルーティング、ツール実行を扱う。
+LLM は Claude Code 側の Claude を使う。OpenClaw は LLM バックエンドではなく、Gateway と MCP bridge の役割を持つ。
 
 ---
 
-## 強み 1: Slack から使える
+## 強み 1: Claude Code から MCP で使える
 
-AI エージェントを専用 CLI や専用 UI に閉じず、普段のチームチャットから呼べる。
+Claude Code は MCP client として `openclaw mcp serve` を起動する。
 
 ```text
-#openclaw-lab
-@OpenClaw リリース前チェックリストを作って
+Claude Code
+  └── openclaw mcp serve
+        └── OpenClaw Gateway
 ```
 
-Slack を入口にすると、チームメンバーは同じ場所で依頼、確認、承認、結果共有ができる。
+Claude Code から見ると、OpenClaw は MCP tools を提供する server になる。
 
-LLM バックエンドが Ollama でも Anthropic / OpenAI でも、Slack 側の体験は大きく変わらない。
+OpenClaw Gateway から見ると、Claude Code は Gateway に接続してくる client の 1 つになる。
 
 ---
 
 ## 強み 3: Gateway をチームで共有できる
 
-OpenClaw Gateway を 1 つ建てると、複数人が同じ入口からエージェントを使える。
+OpenClaw Gateway を 1 つ建てると、複数人が同じ Gateway に接続できる。
 
 ```text
-Team Slack
-  ↓
+Developer A: Claude Code
+Developer B: Claude Code
+Developer C: Claude Code
+        ↓
 Shared OpenClaw Gateway
-  ↓
-Agents / tools / approvals
 ```
 
 チーム利用で重要になるのは、モデル切り替えよりも次の点。
 
-- 誰が使えるか
-- どのチャンネルで反応するか
+- 誰が Gateway に接続できるか
+- Gateway token をどこで管理するか
 - どの操作に承認が必要か
-- token をどこで管理するか
 - Gateway をどう監視するか
+- smolvm の VM をどう再起動・更新するか
 
 ---
 
-## smolvm + OpenClaw の組み合わせ
+## smolvm + OpenClaw + Claude Code の組み合わせ
 
-OpenClaw は便利なぶん、チャット、LLM、ツール実行、外部 API をつなぐ強い権限を持つ。
-
-そこで、勉強会では OpenClaw Gateway を smolvm の中で動かす。
+勉強会では OpenClaw Gateway を smolvm の中で動かし、Claude Code から MCP で接続する。
 
 ```text
 ホストマシン
+├── Claude Code
+│   └── openclaw mcp serve
 └── smolvm
     └── OpenClaw Gateway
-        ├── Slack channel
-        ├── LLM backend
         └── tools / approvals
 ```
 
-この構成なら、Gateway と実行環境をホストから分けて試せる。まず安全に小さく動かし、その後 Slack 連携とチーム共有に進む。
+この構成なら、Claude Code の LLM 体験をそのまま使いながら、OpenClaw Gateway と実行環境をホストから分けて試せる。

@@ -8,7 +8,7 @@
 ホストマシン
 └── smolvm machine: openclaw
     └── Node.js 24
-        └── OpenClaw Gateway :18789
+        └── OpenClaw Gateway :18789（VM 内 localhost）
 ```
 
 ---
@@ -61,7 +61,7 @@ init = [
 | `net = true` | npm install と Gateway 通信のためにネットワークを有効化 |
 | `[dev].init` | VM 作成時に OpenClaw CLI を入れてバージョン確認する |
 
-> 勉強会ではまず `net = true` で進める。Slack 連携まで動いたあと、必要に応じて `allow_hosts` で外向き通信を絞る。
+> 勉強会ではまず `net = true` で進める。Claude Code MCP 接続まで動いたあと、必要に応じて `allow_hosts` で外向き通信を絞る。
 
 ---
 
@@ -100,7 +100,7 @@ smolvm machine exec --name openclaw -it -- sh
 
 `onboard` は対話式の初期設定ウィザードなので、smolvm 経由の PTY と相性が悪い環境では画面が崩れることがある。勉強会では再現性を優先し、必要な値を環境変数で渡して Gateway を直接起動する。
 
-LLM バックエンドの API キーを使う場合は、Gateway 起動時の環境変数や Control UI で設定する。OpenClaw の主題はチャンネル連携とチーム共有なので、Ollama / Anthropic / OpenAI の切り替えは後続章で軽く触れる。
+LLM バックエンドの API キーを使う場合は、Gateway 起動時の環境変数や設定ファイルで渡す。この資料では Claude Code 側の Claude を使うため、OpenClaw 側の LLM バックエンド設定は扱わない。
 
 ---
 
@@ -115,45 +115,25 @@ export OPENCLAW_GATEWAY_TOKEN=smolvm-local-token
 
 openclaw gateway \
   --port 18789 \
-  --bind lan \
   --allow-unconfigured \
   --verbose
 ```
 
-`--bind lan` を使うので、認証トークンを必ず設定する。勉強会では説明を簡単にするため固定値にしているが、実運用では `openclaw doctor --generate-gateway-token` などで生成した値を使う。
+勉強会では説明を簡単にするため Gateway token を固定値にしているが、実運用では `openclaw doctor --generate-gateway-token` などで生成した値を使う。
 
-`Missing config. Run openclaw setup...` と出る場合は `--allow-unconfigured` が付いているか確認する。ここでは Slack 連携前の空設定で Gateway を起動するため、このオプションを付ける。
+ここでは `--bind lan` を付けない。Gateway は VM 内の localhost で待ち受ける。Claude Code からは次章で `smolvm machine exec` 経由の MCP server を使って接続する。
 
-別ターミナルで VM の IP を確認する。
+`Missing config. Run openclaw setup...` と出る場合は `--allow-unconfigured` が付いているか確認する。ここでは MCP 接続前の空設定で Gateway を起動するため、このオプションを付ける。
 
-```bash
-smolvm machine list
-```
-
-表示された IP を使って、ホスト側のブラウザで Control UI を開く。
-
-```text
-http://<VM_IP>:18789/
-```
-
-認証を求められたら、次のトークンを入力する。
-
-```text
-smolvm-local-token
-```
+`non-loopback Control UI requires gateway.controlUi.allowedOrigins...` と出る場合は、`--bind lan` を付けて起動している。Claude Code MCP の手順では `--bind lan` を外す。
 
 ---
 
 ## 6. 動作確認
 
-Gateway を起動したまま、別ターミナルから状態を確認する。
+Gateway を起動しているターミナルで、エラーが出ずにプロセスが残っていればセットアップ完了。
 
-```bash
-smolvm machine exec --name openclaw -- openclaw gateway status
-smolvm machine exec --name openclaw -- openclaw status
-```
-
-Control UI が開けて、Gateway が running になっていればセットアップ完了。
+`openclaw gateway status` は環境によって待ち続けることがあるので、この手順では使わない。
 
 ---
 
@@ -181,7 +161,6 @@ export OPENCLAW_GATEWAY_TOKEN=smolvm-local-token
 
 openclaw gateway \
   --port 18789 \
-  --bind lan \
   --allow-unconfigured \
   --verbose
 ```
@@ -199,6 +178,6 @@ smolvm machine delete openclaw
 - `smol-machines/smolvm` をインストールした
 - Smolfile 1 枚で Node.js + OpenClaw 環境を宣言した
 - OpenClaw Gateway を VM 内で起動した
-- ホスト側ブラウザから Control UI に接続した
+- Gateway を VM 内 localhost で待ち受けさせた
 
-次のステップでは、この Gateway を Slack と接続する。
+次のステップでは、この Gateway に Claude Code から MCP 接続する。
